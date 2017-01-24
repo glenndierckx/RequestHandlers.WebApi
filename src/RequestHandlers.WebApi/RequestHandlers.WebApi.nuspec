@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package xmlns="https://raw.githubusercontent.com/NuGet/NuGet.Client/dev/src/NuGet.Core/NuGet.Packaging/compiler/resources/nuspec.xsd">
+  <metadata>
+    <id>RequestHandler.WebApi</id>
+    <version>1.0.0.0</version>
+    <title>RequestHandler.WebApi</title>
+    <authors>Glenn Dierckx</authors>
+    <owners>Glenn Dierckx</owners>
+    <projectUrl>https://github.com/glenndierckx/RequestHandlers.WebApi</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>WebApi controller builder for Requesthandlers</description>
+    <releaseNotes></releaseNotes>
+    <copyright>Copyright 2017</copyright>
+    <tags>RequestHandler RequestHandlers WebApi</tags>
+    <dependencies>
+      <dependency id="RequestHandlers" />
+      <dependency id="Microsoft.CodeAnalysis.CSharp" />
+      <dependency id="Microsoft.AspNet.WebApi.Core" />
+    </dependencies>
+  </metadata>
+</package>
