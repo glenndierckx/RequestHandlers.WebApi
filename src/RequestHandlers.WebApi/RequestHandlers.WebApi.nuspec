@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <package>
   <metadata>
-    <id>RequestHandler.WebApi</id>
+    <id>RequestHandlers.WebApi</id>
     <version>1.0.0.0</version>
-    <title>RequestHandler.WebApi</title>
+    <title>RequestHandlers.WebApi</title>
     <authors>Glenn Dierckx</authors>
     <owners>Glenn Dierckx</owners>
     <projectUrl>https://github.com/glenndierckx/RequestHandlers.WebApi</projectUrl>
