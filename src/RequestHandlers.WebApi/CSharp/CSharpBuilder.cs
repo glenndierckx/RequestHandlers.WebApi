@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -95,7 +96,8 @@ namespace RequestHandlers.WebApi.CSharp
                 Type = x.First().BindingType == BindingType.FromBody || x.First().BindingType == BindingType.FromForm ? requestClass : GetCorrectFormat(x.First().PropertyInfo.PropertyType),
                 Binder = x.First().BindingType == BindingType.FromBody ? "FromBody" : "FromUri"
             }).Select(x => $"[System.Web.Http.{x.Binder}Attribute] {x.Type} {x.Name}"));
-
+            var isAsync = builderDefinition.Definition.ResponseType.IsConstructedGenericType &&
+                          builderDefinition.Definition.ResponseType.GetGenericTypeDefinition() == typeof(Task<>);
             yield return $"    public class {className} : System.Web.Http.ApiController";
             yield return "    {";
             yield return "        private readonly RequestHandlers.IRequestDispatcher _requestDispatcher;";
@@ -105,10 +107,10 @@ namespace RequestHandlers.WebApi.CSharp
             yield return "            _requestDispatcher = requestDispatcher;";
             yield return "        }";
             yield return $"        [System.Web.Http.Http{builderDefinition.HttpMethod}Attribute, System.Web.Http.RouteAttribute(\"{builderDefinition.Route}\")]";
-            yield return $"        public {GetCorrectFormat(builderDefinition.Definition.ResponseType)} Handle({methodArgs})";
+            yield return $"        public  {(isAsync ? "async " : string.Empty)}{GetCorrectFormat(builderDefinition.Definition.ResponseType)} Handle({methodArgs})";
             yield return "        {";
             var requestVariable = "request_" + Guid.NewGuid().ToString().Replace("-", "");
-            yield return $"            var {requestVariable} = new {builderDefinition.Definition.RequestType.FullName}";
+            yield return $"            var {requestVariable} = new {GetCorrectFormat(builderDefinition.Definition.RequestType)}";
             yield return "            {";
             foreach (var assignment in builderDefinition.Parameters)
             {
@@ -116,7 +118,7 @@ namespace RequestHandlers.WebApi.CSharp
                 yield return $"                {assignment.PropertyInfo.Name} = {assignment.PropertyName}{(fromRequest ? $".{assignment.PropertyInfo.Name}" : "")},";
             }
             yield return "            };";
-            yield return $"            var response = _requestDispatcher.Process<{builderDefinition.Definition.RequestType.FullName},{builderDefinition.Definition.ResponseType.FullName}>({requestVariable});";
+            yield return $"            var response = {(isAsync ? "await " : string.Empty)}_requestDispatcher.Process<{GetCorrectFormat(builderDefinition.Definition.RequestType)},{GetCorrectFormat(builderDefinition.Definition.ResponseType)}>({requestVariable});";
             yield return "            return response;";
             yield return "        }";
             yield return "    }";

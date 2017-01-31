@@ -11,13 +11,14 @@ using Microsoft.Owin;
 using Owin;
 using RequestHandlers.Http;
 using RequestHandlers.WebApi;
+//using RequestHandlers.WebApi;
 using Swashbuckle.Application;
 
 [assembly: OwinStartup(typeof(RequestHandlers.TestHost.Startup))]
 
 namespace RequestHandlers.TestHost
 {
-    [GetRequest("api/dagmoeder")]
+    [GetRequest("api/test")]
     public class TestRequest : IReturn<TestResponse>
     {
         
@@ -28,10 +29,11 @@ namespace RequestHandlers.TestHost
         
     }
 
-    public class TestRequestHandlers : IRequestHandler<TestRequest, TestResponse>
+    public class TestRequestHandlers : IAsyncRequestHandler<TestRequest, TestResponse>
     {
-        public TestResponse Handle(TestRequest request)
+        public async Task<TestResponse> Handle(TestRequest request)
         {
+            await Task.FromResult(0);
             return new TestResponse();
         }
     }

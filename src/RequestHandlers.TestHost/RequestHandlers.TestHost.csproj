@@ -84,8 +84,8 @@
       <HintPath>..\packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="RequestHandlers, Version=3.0.17024.3, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\RequestHandlers.3.0.17024.03\lib\net461\RequestHandlers.dll</HintPath>
+    <Reference Include="RequestHandlers, Version=3.0.17031.2, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\RequestHandlers.3.0.17031.02\lib\net461\RequestHandlers.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Swashbuckle.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cd1bb07a5ac7c7bc, processorArchitecture=MSIL">
