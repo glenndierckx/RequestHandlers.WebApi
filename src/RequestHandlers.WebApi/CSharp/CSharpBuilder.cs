@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using RequestHandlers.Http;
 
 namespace RequestHandlers.WebApi.CSharp
@@ -58,21 +60,21 @@ namespace RequestHandlers.WebApi.CSharp
             if (!_debug)
             {
                 var assemblyStream = new MemoryStream();
-                var result = compilation.Emit(assemblyStream, manifestResources: manifestResources);
+                var result = compilation.Emit(assemblyStream);
                 CheckCompilationForErrors(result, csharpControllers);
                 assemblyStream.Seek(0, SeekOrigin.Begin);
-                _assembly = Assembly.Load(assemblyStream.ToArray());
+                return Assembly.Load(assemblyStream.ToArray());
             }
             else
             {
                 var assemblyStream = new MemoryStream();
                 var pdbStream = new MemoryStream();
-                var result = compilation.Emit(assemblyStream, pdbStream, manifestResources: manifestResources);
+                var result = compilation.Emit(assemblyStream, pdbStream);
                 CheckCompilationForErrors(result, csharpControllers);
                 assemblyStream.Seek(0, SeekOrigin.Begin);
                 pdbStream.Seek(0, SeekOrigin.Begin);
                 var rawAssembly = assemblyStream.ToArray();
-                _assembly = Assembly.Load(rawAssembly, pdbStream.ToArray());
+                return Assembly.Load(rawAssembly, pdbStream.ToArray());
             }
         }
         private static void CheckCompilationForErrors(EmitResult result, List<string> codes)

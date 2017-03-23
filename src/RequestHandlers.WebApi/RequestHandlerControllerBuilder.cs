@@ -40,9 +40,9 @@ namespace RequestHandlers.WebApi
     
     public static class WebApiConfig
     {
-        public static Assembly ConfigureRequestHandlers(this HttpConfiguration config, IRequestDefinition[] requestHandlerDefinitions)
+        public static Assembly ConfigureRequestHandlers(this HttpConfiguration config, IRequestDefinition[] requestHandlerDefinitions, IControllerAssemblyBuilder controllerAssemblyBuilder = null)
         {
-            var assembly = RequestHandlerControllerBuilder.Build(requestHandlerDefinitions);
+            var assembly = RequestHandlerControllerBuilder.Build(requestHandlerDefinitions, controllerAssemblyBuilder);
 
             return config.ReplaceServicesSoNewControllersInGeneratedAssembliesCanBeResolved(assembly);
         }
