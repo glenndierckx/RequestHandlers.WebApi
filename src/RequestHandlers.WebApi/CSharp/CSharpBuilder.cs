@@ -14,7 +14,7 @@ using RequestHandlers.Http;
 
 namespace RequestHandlers.WebApi.CSharp
 {
-    class CSharpBuilder : IControllerAssemblyBuilder
+    public class CSharpBuilder : IControllerAssemblyBuilder
     {
         private readonly HashSet<string> _classNames;
         private readonly string _assemblyName;
