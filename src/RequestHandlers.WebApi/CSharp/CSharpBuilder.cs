@@ -16,9 +16,11 @@ namespace RequestHandlers.WebApi.CSharp
     {
         private readonly HashSet<string> _classNames;
         private readonly string _assemblyName;
+        private readonly bool _debug;
 
-        public CSharpBuilder(string assemblyName)
+        public CSharpBuilder(string assemblyName, bool debug = false)
         {
+            _debug = debug;
             _classNames = new HashSet<string>();
             _assemblyName = assemblyName;
         }
@@ -31,7 +33,8 @@ namespace RequestHandlers.WebApi.CSharp
                 .GetReferences();
 
             var compilation = CSharpCompilation.Create(_assemblyName)
-                .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                    .WithOptimizationLevel(_debug ? OptimizationLevel.Debug : OptimizationLevel.Release))
                 .AddReferences(references);
             var csharpControllers = new List<string>();
             foreach (var temp in definitions)
@@ -41,11 +44,39 @@ namespace RequestHandlers.WebApi.CSharp
                     sb.AppendLine(line);
                 var csharp = sb.ToString();
                 csharpControllers.Add(csharp);
+                if(_debug){
+                    var filePath = Path.Combine(Path.GetTempPath(), $"rc_{GetClassName(temp.Definition.RequestType)}.cs");
+                    File.WriteAllText(filePath, csharp, Encoding.UTF8);
+                    compilation =
+                        compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharp, path: filePath,
+                            encoding: Encoding.UTF8));
+                }else{
                 compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharp));
+                }
             }
-
-            var assemblyStream = new MemoryStream();
-            var result = compilation.Emit(assemblyStream);
+            
+            if (!_debug)
+            {
+                var assemblyStream = new MemoryStream();
+                var result = compilation.Emit(assemblyStream, manifestResources: manifestResources);
+                CheckCompilationForErrors(result, csharpControllers);
+                assemblyStream.Seek(0, SeekOrigin.Begin);
+                _assembly = Assembly.Load(assemblyStream.ToArray());
+            }
+            else
+            {
+                var assemblyStream = new MemoryStream();
+                var pdbStream = new MemoryStream();
+                var result = compilation.Emit(assemblyStream, pdbStream, manifestResources: manifestResources);
+                CheckCompilationForErrors(result, csharpControllers);
+                assemblyStream.Seek(0, SeekOrigin.Begin);
+                pdbStream.Seek(0, SeekOrigin.Begin);
+                var rawAssembly = assemblyStream.ToArray();
+                _assembly = Assembly.Load(rawAssembly, pdbStream.ToArray());
+            }
+        }
+        private static void CheckCompilationForErrors(EmitResult result, List<string> codes)
+        {
             if (!result.Success)
             {
                 var errormsg = new StringBuilder();
@@ -53,10 +84,8 @@ namespace RequestHandlers.WebApi.CSharp
                 {
                     errormsg.AppendLine(diagnostic.ToString());
                 }
-                throw new Exception(string.Join(Environment.NewLine, csharpControllers), new Exception(errormsg.ToString()));
+                throw new Exception(string.Join(Environment.NewLine, codes), new Exception(errormsg.ToString()));
             }
-            assemblyStream.Seek(0, SeekOrigin.Begin);
-            return Assembly.Load(assemblyStream.ToArray());
         }
 
         private string GetClassName(Type requestType)
