@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Web.Http;
+using System.Web.Http.Description;
 using System.Web.Http.Dispatcher;
 using Autofac;
 using Autofac.Integration.WebApi;
@@ -45,8 +46,8 @@ namespace RequestHandlers.TestHost
         {
             var builder = new Autofac.ContainerBuilder();
             builder.RegisterType<DefaultRequestDispacher>().As<IRequestDispatcher>();
-            builder.RegisterType<DefaultRequestProcessor>().As<IRequestProcessor>();
             builder.RegisterType<RequestHandlerResolver>().As<IRequestHandlerResolver>();
+            builder.RegisterType<DefaultWebApiRequestProcessor>().As<IWebApiRequestProcessor>();
             var requestHandlerInterface = typeof(IRequestHandler<,>);
             var requestHandlerDefinitions = RequestHandlerFinder.InAssembly(this.GetType().GetTypeInfo().Assembly);
             foreach (var requestHandler in requestHandlerDefinitions)

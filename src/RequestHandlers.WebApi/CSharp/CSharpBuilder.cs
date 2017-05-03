@@ -7,6 +7,7 @@ using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
+using System.Web.Http.Description;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
@@ -39,21 +40,38 @@ namespace RequestHandlers.WebApi.CSharp
                     .WithOptimizationLevel(_debug ? OptimizationLevel.Debug : OptimizationLevel.Release))
                 .AddReferences(references);
             var csharpControllers = new List<string>();
-            foreach (var temp in definitions)
+            var operationResults = definitions.Select(temp => CreateCSharp(GetClassName(temp.Definition.RequestType), temp)).ToArray();
+            var files = new Dictionary<string, string>();
+            files.Add("ProxyController", $@"namespace Proxy
+{{
+    public class ProxyController : {GetCorrectFormat(typeof(ApiController))}
+    {{
+        private readonly {GetCorrectFormat(typeof(IWebApiRequestProcessor))} _requestProcessor;
+        public ProxyController({GetCorrectFormat(typeof(IWebApiRequestProcessor))} requestProcessor)
+        {{
+            _requestProcessor = requestProcessor;
+        }}
+
+    {CodeStr.Foreach(operationResults.SelectMany(x => x.Operation.Split(new [] {Environment.NewLine}, StringSplitOptions.None)), operation => $@"
+        {operation}")}
+    }}
+}}");
+
+            foreach (var operationResult in operationResults)
             {
-                var sb = new StringBuilder();
-                foreach (var line in CreateCSharp(GetClassName(temp.Definition.RequestType), temp))
-                    sb.AppendLine(line);
-                var csharp = sb.ToString();
-                csharpControllers.Add(csharp);
+                files.Add(operationResult.OperationName, operationResult.RequestClass);
+            }
+
+            foreach (var temp in files)
+            {
                 if(_debug){
-                    var filePath = Path.Combine(Path.GetTempPath(), $"rc_{GetClassName(temp.Definition.RequestType)}.cs");
-                    File.WriteAllText(filePath, csharp, Encoding.UTF8);
+                    var filePath = Path.Combine(Path.GetTempPath(), $"rc_{temp.Key}.cs");
+                    File.WriteAllText(filePath, temp.Value, Encoding.UTF8);
                     compilation =
-                        compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharp, path: filePath,
+                        compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(temp.Value, path: filePath,
                             encoding: Encoding.UTF8));
                 }else{
-                compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharp));
+                compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(temp.Value));
                 }
             }
             
@@ -98,28 +116,16 @@ namespace RequestHandlers.WebApi.CSharp
             do
             {
                 var add = addition.HasValue ? addition.ToString() : "";
-                className = $"{name}Handler{add}Controller";
+                className = $"{name}Handler{add}";
                 addition = addition + 1 ?? 2;
             } while (_classNames.Contains(className));
             return className;
         }
-        public IEnumerable<string> CreateCSharp(string className, HttpRequestHandlerDefinition builderDefinition)
+        public OperationResult CreateCSharp(string operationName, HttpRequestHandlerDefinition builderDefinition)
         {
-            yield return "namespace Proxy";
-            yield return "{";
-
             var requestBodyProperties = builderDefinition.Parameters.Where(x => x.BindingType == BindingType.FromBody || x.BindingType == BindingType.FromForm).ToArray();
             var requestClass = builderDefinition.Definition.RequestType.Name + "_" + Guid.NewGuid().ToString().Replace("-", "");
-            if (requestBodyProperties.Any())
-            {
-                yield return $"    public class {requestClass}";
-                yield return "    {";
-                foreach (var source in requestBodyProperties)
-                {
-                    yield return $"        public {GetCorrectFormat(source.PropertyInfo.PropertyType)} {source.PropertyInfo.Name} {{ get; set; }}";
-                }
-                yield return "    }";
-            }
+
 
             var methodArgs = string.Join(",  ", builderDefinition.Parameters.GroupBy(x => x.PropertyName).Select(x => new
             {
@@ -129,31 +135,31 @@ namespace RequestHandlers.WebApi.CSharp
             }).Select(x => $"[System.Web.Http.{x.Binder}Attribute] {x.Type} {x.Name}"));
             var isAsync = builderDefinition.Definition.ResponseType.IsConstructedGenericType &&
                           builderDefinition.Definition.ResponseType.GetGenericTypeDefinition() == typeof(Task<>);
-            yield return $"    public class {className} : System.Web.Http.ApiController";
-            yield return "    {";
-            yield return "        private readonly RequestHandlers.IRequestDispatcher _requestDispatcher;";
-            yield return "";
-            yield return $"        public {className}(RequestHandlers.IRequestDispatcher requestDispatcher)";
-            yield return "        {";
-            yield return "            _requestDispatcher = requestDispatcher;";
-            yield return "        }";
-            yield return $"        [System.Web.Http.Http{builderDefinition.HttpMethod}Attribute, System.Web.Http.RouteAttribute(\"{builderDefinition.Route}\")]";
-            yield return $"        public  {(isAsync ? "async " : string.Empty)}{GetCorrectFormat(builderDefinition.Definition.ResponseType)} Handle({methodArgs})";
-            yield return "        {";
+            var responseType = isAsync 
+                ? builderDefinition.Definition.ResponseType.GetGenericArguments()[0]
+                : builderDefinition.Definition.ResponseType;
             var requestVariable = "request_" + Guid.NewGuid().ToString().Replace("-", "");
-            yield return $"            var {requestVariable} = new {GetCorrectFormat(builderDefinition.Definition.RequestType)}";
-            yield return "            {";
-            foreach (var assignment in builderDefinition.Parameters)
-            {
-                var fromRequest = assignment.BindingType == BindingType.FromBody || assignment.BindingType == BindingType.FromForm;
-                yield return $"                {assignment.PropertyInfo.Name} = {assignment.PropertyName}{(fromRequest ? $".{assignment.PropertyInfo.Name}" : "")},";
-            }
-            yield return "            };";
-            yield return $"            var response = {(isAsync ? "await " : string.Empty)}_requestDispatcher.Process<{GetCorrectFormat(builderDefinition.Definition.RequestType)},{GetCorrectFormat(builderDefinition.Definition.ResponseType)}>({requestVariable});";
-            yield return "            return response;";
-            yield return "        }";
-            yield return "    }";
-            yield return "}";
+
+
+
+            var operationResult = new OperationResult();
+            operationResult.OperationName = operationName;
+            operationResult.RequestClass = $@"public class {requestClass}
+{{{CodeStr.Foreach(requestBodyProperties, source => $@"
+    public {GetCorrectFormat(source.PropertyInfo.PropertyType)} {source.PropertyInfo.Name} {{ get; set; }}")}
+}}";
+            operationResult.Operation = $@"[System.Web.Http.Http{builderDefinition.HttpMethod}Attribute, {GetCorrectFormat(typeof(RouteAttribute))}(""{ builderDefinition.Route}""), {GetCorrectFormat(typeof(ResponseTypeAttribute))}(typeof({GetCorrectFormat(responseType)}))]
+public  {(isAsync ? "async " : string.Empty)}{GetCorrectFormat(isAsync ? typeof(Task<IHttpActionResult>) : typeof(IHttpActionResult))} {operationName}({methodArgs})
+{{
+    var {requestVariable} = new {GetCorrectFormat(builderDefinition.Definition.RequestType)}
+    {{{CodeStr.Foreach(builderDefinition.Parameters, assignment => $@"
+        {assignment.PropertyInfo.Name} = {assignment.PropertyName}{(assignment.BindingType == BindingType.FromBody || assignment.BindingType == BindingType.FromForm ? $".{assignment.PropertyInfo.Name}" : "")},").Trim(',')}
+    }};
+
+    var response = {(isAsync ? "await " : string.Empty)}_requestProcessor.Process{(isAsync ? "Async" : string.Empty)}<{GetCorrectFormat(builderDefinition.Definition.RequestType)},{GetCorrectFormat(responseType)}>({requestVariable}, this);
+    return response;
+}}";
+            return operationResult;
         }
 
         private string GetCorrectFormat(Type type)
@@ -168,5 +174,27 @@ namespace RequestHandlers.WebApi.CSharp
             else
                 return type.FullName;
         }
+    }
+
+    public class OperationResult
+    {
+        public string OperationName { get; set; }
+        public string RequestClass { get; set; }
+        public string Operation { get; set; }
+    }
+    static class CodeStr
+    {
+        public static string Foreach<T>(IEnumerable<T> source, Func<T, string> format)
+        {
+            var sb = new StringBuilder();
+            foreach (var item in source)
+            {
+                sb.Append(format(item));
+            }
+            return sb.ToString();
+        }
+
+        public static string If(bool value, string ifTrue, string ifFalse = "") => value ? ifTrue : ifFalse;
+        public static string Wrap(Func<string> action) => action();
     }
 }
