@@ -29,8 +29,15 @@ namespace RequestHandlers.WebApi.CSharp
             _neededAssemblies.Add(assembly.Location, assembly);
             foreach (var referencedAssembly in assembly.GetReferencedAssemblies())
             {
-                var refAssembly = Assembly.Load(referencedAssembly);
-                AddAssembly(refAssembly);
+                try
+                {
+                    var refAssembly = Assembly.Load(referencedAssembly);
+                    AddAssembly(refAssembly);
+                }
+                catch
+                {
+                    // todo: better reference detection
+                }
             }
         }
     }
