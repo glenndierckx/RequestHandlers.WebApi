@@ -19,7 +19,8 @@ namespace RequestHandlers.WebApi.CSharp
     {
         public class Options
         {
-            public string RoutePrefix { get; set; }        
+            public string RoutePrefix { get; set; }
+            public IEnumerable<Type> ControllerAttributeTypes { get; set; }
         }
         private readonly HashSet<string> _classNames;
         private readonly string _assemblyName;
@@ -38,6 +39,7 @@ namespace RequestHandlers.WebApi.CSharp
         {
             var references = new AssemblyReferencesHelper()
                 .AddReferenceForTypes(typeof(object), typeof(ApiController), typeof(RequestHandlerControllerBuilder))
+                .AddReferenceForTypes(GetType())
                 .AddReferenceForTypes(definitions.SelectMany(x => new[] { x.Definition.RequestType, x.Definition.ResponseType }).ToArray())
                 .GetReferences();
 
@@ -50,7 +52,8 @@ namespace RequestHandlers.WebApi.CSharp
             var files = new Dictionary<string, string>();
             files.Add("ProxyController", $@"namespace Proxy
 {{{CodeStr.If(!string.IsNullOrEmpty(_options.RoutePrefix), $@"
-    [{GetCorrectFormat(typeof(RoutePrefixAttribute))}(""{_options.RoutePrefix}"")]")}
+    [{GetCorrectFormat(typeof(RoutePrefixAttribute))}(""{_options.RoutePrefix}"")]")}{CodeStr.Foreach(_options?.ControllerAttributeTypes, x => $@"
+    [{GetCorrectFormat(x)}]")}
     public class ProxyController : {GetCorrectFormat(typeof(ApiController))}
     {{
         private readonly {GetCorrectFormat(typeof(IWebApiRequestProcessor))} _requestProcessor;
@@ -195,9 +198,12 @@ public  {(isAsync ? "async " : string.Empty)}{GetCorrectFormat(isAsync ? typeof(
         public static string Foreach<T>(IEnumerable<T> source, Func<T, string> format)
         {
             var sb = new StringBuilder();
-            foreach (var item in source)
+            if (source != null)
             {
-                sb.Append(format(item));
+                foreach (var item in source)
+                {
+                    sb.Append(format(item));
+                }                
             }
             return sb.ToString();
         }
