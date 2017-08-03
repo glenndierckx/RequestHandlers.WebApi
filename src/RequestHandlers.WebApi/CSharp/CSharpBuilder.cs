@@ -142,17 +142,16 @@ namespace RequestHandlers.WebApi.CSharp
             {
                 Name = x.Key,
                 Type = x.First().BindingType == BindingType.FromBody || x.First().BindingType == BindingType.FromForm ? requestClass : GetCorrectFormat(x.First().PropertyInfo.PropertyType),
-                Binder = x.First().BindingType == BindingType.FromBody ? "FromBody" : "FromUri"
-            }).Select(x => $"[System.Web.Http.{x.Binder}Attribute] {x.Type} {x.Name}"));
+                Binder = x.First().BindingType == BindingType.FromBody ? "FromBody" : "FromUri",
+                BindingType = x.First().BindingType
+            }).Select(x => $"[System.Web.Http.{x.Binder}Attribute] {x.Type} {x.Name}{CodeStr.If(x.BindingType == BindingType.FromQuery, $" = default({x.Type})")}"));
             var isAsync = builderDefinition.Definition.ResponseType.IsConstructedGenericType &&
                           builderDefinition.Definition.ResponseType.GetGenericTypeDefinition() == typeof(Task<>);
             var responseType = isAsync 
                 ? builderDefinition.Definition.ResponseType.GetGenericArguments()[0]
                 : builderDefinition.Definition.ResponseType;
             var requestVariable = "request_" + Guid.NewGuid().ToString().Replace("-", "");
-
-
-
+            
             var operationResult = new OperationResult();
             operationResult.OperationName = operationName;
             operationResult.RequestClass = $@"public class {requestClass}
@@ -162,10 +161,8 @@ namespace RequestHandlers.WebApi.CSharp
             operationResult.Operation = $@"[System.Web.Http.Http{builderDefinition.HttpMethod}Attribute, {GetCorrectFormat(typeof(RouteAttribute))}(""{ builderDefinition.Route}""), {GetCorrectFormat(typeof(ResponseTypeAttribute))}(typeof({GetCorrectFormat(responseType)}))]
 public  {(isAsync ? "async " : string.Empty)}{GetCorrectFormat(isAsync ? typeof(Task<IHttpActionResult>) : typeof(IHttpActionResult))} {operationName}({methodArgs})
 {{
-    var {requestVariable} = new {GetCorrectFormat(builderDefinition.Definition.RequestType)}
-    {{{CodeStr.Foreach(builderDefinition.Parameters, assignment => $@"
-        {assignment.PropertyInfo.Name} = {assignment.PropertyName}{(assignment.BindingType == BindingType.FromBody || assignment.BindingType == BindingType.FromForm ? $".{assignment.PropertyInfo.Name}" : "")},").Trim(',')}
-    }};
+    var {requestVariable} = new {GetCorrectFormat(builderDefinition.Definition.RequestType)}();{CodeStr.Foreach(builderDefinition.Parameters, assignment => $@"
+    {requestVariable}.{assignment.PropertyInfo.Name} = {assignment.PropertyName}{(assignment.BindingType == BindingType.FromBody || assignment.BindingType == BindingType.FromForm ? $".{assignment.PropertyInfo.Name}" : "")};")}
 
     var response = {(isAsync ? "await " : string.Empty)}_requestProcessor.Process{(isAsync ? "Async" : string.Empty)}<{GetCorrectFormat(builderDefinition.Definition.RequestType)},{GetCorrectFormat(responseType)}>({requestVariable}, this);
     return response;
