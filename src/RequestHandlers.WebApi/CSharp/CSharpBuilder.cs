@@ -17,13 +17,19 @@ namespace RequestHandlers.WebApi.CSharp
 {
     public class CSharpBuilder : IControllerAssemblyBuilder
     {
+        public class Options
+        {
+            public string RoutePrefix { get; set; }        
+        }
         private readonly HashSet<string> _classNames;
         private readonly string _assemblyName;
         private readonly bool _debug;
+        private readonly Options _options;
 
-        public CSharpBuilder(string assemblyName, bool debug = false)
+        public CSharpBuilder(string assemblyName, bool debug = false, Options options = null)
         {
             _debug = debug;
+            _options = options;
             _classNames = new HashSet<string>();
             _assemblyName = assemblyName;
         }
@@ -43,7 +49,8 @@ namespace RequestHandlers.WebApi.CSharp
             var operationResults = definitions.Select(temp => CreateCSharp(GetClassName(temp.Definition.RequestType), temp)).ToArray();
             var files = new Dictionary<string, string>();
             files.Add("ProxyController", $@"namespace Proxy
-{{
+{{{CodeStr.If(!string.IsNullOrEmpty(_options.RoutePrefix), $@"
+    [{GetCorrectFormat(typeof(RoutePrefixAttribute))}(""{_options.RoutePrefix}"")]")}
     public class ProxyController : {GetCorrectFormat(typeof(ApiController))}
     {{
         private readonly {GetCorrectFormat(typeof(IWebApiRequestProcessor))} _requestProcessor;
@@ -119,6 +126,7 @@ namespace RequestHandlers.WebApi.CSharp
                 className = $"{name}Handler{add}";
                 addition = addition + 1 ?? 2;
             } while (_classNames.Contains(className));
+            _classNames.Add(className);
             return className;
         }
         public OperationResult CreateCSharp(string operationName, HttpRequestHandlerDefinition builderDefinition)
