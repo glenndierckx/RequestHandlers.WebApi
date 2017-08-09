@@ -22,6 +22,7 @@ namespace RequestHandlers.WebApi.CSharp
             public string RoutePrefix { get; set; }
             public IEnumerable<Type> ControllerAttributeTypes { get; set; }
         }
+
         private readonly HashSet<string> _classNames;
         private readonly string _assemblyName;
         private readonly bool _debug;
@@ -30,7 +31,7 @@ namespace RequestHandlers.WebApi.CSharp
         public CSharpBuilder(string assemblyName, bool debug = false, Options options = null)
         {
             _debug = debug;
-            _options = options;
+            _options = options ?? new Options();
             _classNames = new HashSet<string>();
             _assemblyName = assemblyName;
         }
