@@ -51,7 +51,7 @@ namespace RequestHandlers.WebApi.CSharp
             var operationResults = definitions.Select(temp => CreateCSharp(GetClassName(temp.Definition.RequestType), temp)).ToArray();
             var files = new Dictionary<string, string>();
             files.Add("ProxyController", $@"namespace Proxy
-{{{CodeStr.If(!string.IsNullOrEmpty(_options.RoutePrefix), $@"
+{{{CodeStr.If(!string.IsNullOrEmpty(_options?.RoutePrefix), $@"
     [{GetCorrectFormat(typeof(RoutePrefixAttribute))}(""{_options.RoutePrefix}"")]")}{CodeStr.Foreach(_options?.ControllerAttributeTypes, x => $@"
     [{GetCorrectFormat(x)}]")}
     public class ProxyController : {GetCorrectFormat(typeof(ApiController))}
